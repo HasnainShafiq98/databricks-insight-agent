@@ -1,348 +1,319 @@
-# Databricks Insight Agent
+# 🔍 Databricks Insight Agent
 
-An AI-powered analytics assistant that connects to Databricks lakehouse, understands natural language queries, generates safe SQL, and provides business-focused insights using FAISS-based context retrieval.
+> AI-powered analytics assistant for Databricks lakehouse with RAG-based context retrieval and intelligent SQL generation.
 
-## Features
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)](https://streamlit.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-- 🧠 **Intelligent Query Understanding**: Analyzes user queries to identify intent, filters, and required data
-- 🔒 **Security First**: Built-in protection against SQL injection, input validation, and rate limiting
-- 🎯 **Schema-Aware SQL Generation**: Generates SQL only from known schema - no hallucinated columns
-- 🔍 **Context Retrieval**: Uses FAISS vector search for semantic document retrieval
-- 📊 **Business Insights**: Combines SQL results with retrieved context for clear, actionable insights
-- ⚡ **Smart Decision Making**: Automatically decides whether to run SQL, retrieve context, or both
-- 🛡️ **Protection Rules**: Comprehensive security and validation at multiple levels
+---
 
-## Architecture
+## ✨ Features
+
+🧠 **Intelligent Query Understanding** - Analyzes natural language to extract intent, filters, and metrics  
+🔒 **Security First** - Multi-layer SQL injection protection and input validation  
+🎯 **Schema-Aware SQL** - Generates queries only from known schema (no hallucinations)  
+🔍 **RAG System** - FAISS-based semantic document retrieval for contextual insights  
+📊 **Delta Lake Integration** - Bronze/Silver/Gold medallion architecture  
+⚡ **Auto-Correction** - Detects and fixes SQL errors automatically  
+🛡️ **Production Ready** - Error handling, rate limiting, and comprehensive logging
+
+---
+
+## 🚀 Quick Start
+
+### 1. Setup
+```bash
+# Clone repository
+git clone https://github.com/HasnainShafiq98/databricks-insight-agent.git
+cd databricks-insight-agent
+
+# Run automated setup
+./scripts/quickstart.sh
+```
+
+### 2. Configure
+```bash
+# Copy environment template
+cp config/.env.example .env
+
+# Edit with your credentials
+nano .env
+```
+
+### 3. Launch
+```bash
+# Streamlit UI (recommended)
+streamlit run src/ui/app.py
+
+# Or CLI
+python src/ui/main.py
+
+# Or run examples
+python scripts/example_usage.py
+```
+
+---
+
+## 📁 Project Structure
+
+```
+databricks-insight-agent/
+├── src/                          # Source code
+│   ├── core/                     # Core application logic
+│   │   ├── agent.py              # Main orchestrator
+│   │   └── __init__.py
+│   │
+│   ├── data/                     # Data layer
+│   │   ├── databricks_client.py  # SQL connector
+│   │   ├── data_pipeline.py      # Delta table pipeline
+│   │   ├── dbfs_integration.py   # DBFS storage
+│   │   └── __init__.py
+│   │
+│   ├── intelligence/             # AI/ML components
+│   │   ├── sql_generator.py      # SQL generation
+│   │   ├── sql_error_correction.py # Auto-correction
+│   │   ├── context_retriever.py  # RAG system
+│   │   ├── document_processor.py # Document chunking
+│   │   └── __init__.py
+│   │
+│   ├── security/                 # Security layer
+│   │   ├── security.py           # Validation & rate limiting
+│   │   └── __init__.py
+│   │
+│   └── ui/                       # User interfaces
+│       ├── app.py                # Streamlit web UI
+│       ├── main.py               # CLI interface
+│       └── __init__.py
+│
+├── tests/                        # Test suite
+│   ├── test_core.py              # Core tests
+│   ├── examples.py               # Example queries
+│   └── __init__.py
+│
+├── scripts/                      # Utility scripts
+│   ├── quickstart.sh             # Setup automation
+│   └── example_usage.py          # Complete demos
+│
+├── docs/                         # Documentation
+│   ├── README.md                 # This file
+│   ├── SETUP_GUIDE.md            # Setup instructions
+│   ├── DEVELOPMENT.md            # Development guide
+│   ├── GIT_WORKFLOW.md           # Git workflow
+│   ├── PROJECT_SUMMARY.md        # Implementation details
+│   ├── ARCHITECTURE.md           # System architecture
+│   └── SECURITY.md               # Security guidelines
+│
+├── config/                       # Configuration
+│   └── .env.example              # Environment template
+│
+├── data/                         # Data storage
+│   ├── csv/                      # Input CSV files
+│   ├── documents/                # Knowledge base
+│   ├── cache/                    # Local cache
+│   └── logs/                     # Application logs
+│
+├── requirements.txt              # Python dependencies
+├── .gitignore                    # Git ignore rules
+└── .env                          # Local config (not in git)
+```
+
+---
+
+## 🎯 Architecture
 
 ```
 User Query
     ↓
-Security Validation (Input validation, Rate limiting)
+Security Validation
     ↓
-Query Analysis (Intent detection, Filter identification)
+Intent Analysis
     ↓
-Decision Logic (SQL / Context / Both / Clarification)
-    ↓
-┌─────────────────┐         ┌──────────────────┐
-│  SQL Generator  │         │ Context Retriever│
-│  (Schema-based) │         │  (FAISS Search)  │
-└────────┬────────┘         └────────┬─────────┘
-         │                           │
-         ↓                           ↓
-    Databricks            Retrieved Documents
-    Query Results
-         │                           │
-         └───────────┬───────────────┘
-                     ↓
-            Insight Generation
-                     ↓
-            User Response
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  SQL Mode    │    │ Context Mode │    │  Hybrid Mode │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │                   │                    │
+       ▼                   ▼                    ▼
+  SQL Generator      FAISS Search          Both Systems
+       │                   │                    │
+       ▼                   │                    │
+  Databricks              │                    │
+  Execution               │                    │
+       │                   │                    │
+       └───────────────────┴────────────────────┘
+                           │
+                           ▼
+                  Insight Generation
+                           │
+                           ▼
+                    User Response
 ```
 
-## Installation
+---
 
-1. **Clone the repository**:
-```bash
-git clone https://github.com/HasnainShafiq98/databricks-insight-agent.git
-cd databricks-insight-agent
+## 💡 Usage Examples
+
+### Basic Query
+```python
+"Show me total sales by region"
+→ Generates SQL: SELECT region, SUM(amount) FROM sales GROUP BY region
+→ Executes on Databricks
+→ Returns insights
 ```
 
-2. **Create a virtual environment**:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### Context Query
+```python
+"What is Customer Lifetime Value?"
+→ Retrieves from knowledge base
+→ Returns definition and formula
 ```
 
-3. **Install dependencies**:
-```bash
-pip install -r requirements.txt
+### Hybrid Query
+```python
+"Analyze our Q4 sales performance"
+→ Runs SQL for Q4 data
+→ Retrieves seasonality context
+→ Combines both for comprehensive answer
 ```
 
-4. **Configure environment variables**:
-```bash
-cp .env.example .env
-# Edit .env with your Databricks credentials
-```
+---
 
-## Configuration
+## 🔐 Security Features
 
-Edit the `.env` file with your settings:
+✅ **SQL Injection Prevention** - Multi-layer validation and sanitization  
+✅ **Schema Enforcement** - Only allows queries on known tables/columns  
+✅ **Rate Limiting** - Prevents abuse with configurable limits  
+✅ **Input Validation** - Strict validation of all user inputs  
+✅ **Query Length Limits** - Prevents resource exhaustion  
+✅ **Audit Logging** - Comprehensive logging of all operations
+
+---
+
+## 📊 Data Pipeline
+
+### Medallion Architecture
+
+**Bronze Layer** (Raw Data)
+- Ingests CSV files as-is
+- Adds ingestion metadata
+- Minimal validation
+
+**Silver Layer** (Cleaned Data)
+- Data quality checks
+- Type normalization
+- Duplicate removal
+- Schema validation
+
+**Gold Layer** (Business Metrics)
+- Aggregated KPIs
+- Business-ready analytics
+- Optimized for queries
+
+---
+
+## 🛠️ Configuration
+
+### Environment Variables
+
+Key settings in `.env`:
 
 ```ini
-# Databricks Configuration
+# Databricks (Required)
 DATABRICKS_SERVER_HOSTNAME=your-workspace.cloud.databricks.com
-DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/your-warehouse-id
-DATABRICKS_ACCESS_TOKEN=your-access-token
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/xxx
+DATABRICKS_ACCESS_TOKEN=dapi...
 
-# OpenAI Configuration (optional, for enhanced query understanding)
-OPENAI_API_KEY=your-openai-api-key
-
-# FAISS Configuration
+# Optional
+OPENAI_API_KEY=sk-...                  # Enhanced query understanding
 FAISS_INDEX_PATH=./data/faiss_index.faiss
-DOCUMENTS_PATH=./data/documents
-
-# Security Configuration
 MAX_QUERY_LENGTH=10000
 RATE_LIMIT_PER_MINUTE=60
-ALLOWED_SCHEMAS=default,analytics
-ENABLE_SQL_INJECTION_PROTECTION=true
-
-# Logging
-LOG_LEVEL=INFO
 ```
 
-## Usage
+See [config/.env.example](config/.env.example) for all options.
 
-### Command Line Interface
+---
 
-Run the interactive CLI:
+## 🧪 Testing
 
 ```bash
-python main.py
-```
-
-Example interactions:
-
-```
-You: Show me total sales by region
-✅ Generated SQL: SELECT region, SUM(amount) as total FROM sales GROUP BY region
-📊 Results: 3 records
-💡 Insights: Found regional sales distribution...
-
-You: What tables are available?
-📋 Schema: sales, customers, products
-
-You: Explain the sales table
-💡 Context: The sales table contains transaction data with columns...
-```
-
-### Python API
-
-```python
-from main import initialize_agent, load_configuration
-
-# Initialize
-config = load_configuration()
-agent = initialize_agent(config)
-
-# Process query
-response = agent.process_query("Show me top 10 customers by revenue")
-
-# Access results
-if response.success:
-    print(f"SQL: {response.sql_query}")
-    print(f"Results: {response.results}")
-    print(f"Insights: {response.insights}")
-```
-
-## Security Features
-
-### 1. Input Validation
-- Query length limits
-- Empty query detection
-- SQL injection pattern detection
-- Dangerous keyword blocking
-
-### 2. SQL Generation Safety
-- Only references known schema
-- No column hallucination
-- Parameterized value handling
-- SELECT-only queries
-
-### 3. SQL Validation
-- Syntax validation using sqlparse
-- Schema whitelist enforcement
-- Query type verification
-
-### 4. Rate Limiting
-- Per-user rate limits
-- Configurable limits
-- In-memory tracking
-
-### 5. Access Control
-- Schema-level restrictions
-- Token-based authentication
-- Audit logging
-
-## Project Structure
-
-```
-databricks-insight-agent/
-├── main.py                  # Application entry point
-├── agent.py                 # Main agent orchestration
-├── sql_generator.py         # SQL generation from schema
-├── databricks_client.py     # Databricks connectivity
-├── context_retriever.py     # FAISS-based context retrieval
-├── security.py              # Security and validation
-├── requirements.txt         # Python dependencies
-├── .env.example            # Configuration template
-├── .gitignore              # Git ignore rules
-└── README.md               # This file
-```
-
-## Components
-
-### DatabricksInsightAgent
-Main orchestrator that:
-- Validates user input
-- Analyzes query intent
-- Decides execution strategy
-- Coordinates SQL and context retrieval
-- Generates business insights
-
-### SQLGenerator
-Schema-aware SQL generation:
-- Validates all column references
-- Prevents SQL injection
-- Handles filters, aggregations, ordering
-- Ensures type safety
-
-### ContextRetriever
-FAISS-based semantic search:
-- Indexes documentation and schema info
-- Retrieves relevant context
-- Supports incremental updates
-- Persists index to disk
-
-### SecurityValidator
-Multi-layer protection:
-- Input sanitization
-- SQL injection prevention
-- Pattern matching for dangerous queries
-- Rate limiting enforcement
-
-### DatabricksClient
-Connection management:
-- Secure token authentication
-- Query execution
-- Schema introspection
-- Connection pooling
-
-## Example Queries
-
-The agent can handle various query types:
-
-**Data Retrieval**:
-- "Show me sales data for last month"
-- "Get top 10 products by revenue"
-- "List all customers from USA"
-
-**Aggregation**:
-- "What's the total sales by region?"
-- "Calculate average order value"
-- "Count transactions per day"
-
-**Context/Documentation**:
-- "Explain the sales table"
-- "What columns are in customers table?"
-- "How to join sales and products?"
-
-**Mixed Queries**:
-- "Show revenue by region and explain the trend"
-- "Get customer data and tell me about the schema"
-
-## Development
-
-### Running Tests
-
-```bash
-# Install test dependencies
-pip install pytest pytest-cov
-
-# Run tests
+# Run all tests
 pytest tests/ -v
 
-# With coverage
-pytest tests/ --cov=. --cov-report=html
+# Run with coverage
+pytest tests/ --cov=src --cov-report=html
+
+# Run examples
+python scripts/example_usage.py
 ```
 
-### Adding New Tables
+---
 
-Update the schema manager in `main.py`:
+## 📚 Documentation
 
-```python
-new_table = TableSchema(
-    name="your_table",
-    columns=["col1", "col2", "col3"],
-    column_types={"col1": "STRING", "col2": "INT", "col3": "DATE"},
-    description="Table description"
-)
-schema_manager.add_table(new_table)
-```
+- **[Setup Guide](docs/SETUP_GUIDE.md)** - Complete installation and configuration
+- **[Development Guide](docs/DEVELOPMENT.md)** - Architecture and dev workflow
+- **[Git Workflow](docs/GIT_WORKFLOW.md)** - Version control best practices
+- **[Project Summary](docs/PROJECT_SUMMARY.md)** - Implementation details
+- **[Architecture](docs/ARCHITECTURE.md)** - System design
+- **[Security](docs/SECURITY.md)** - Security guidelines
 
-### Adding Documents to FAISS
+---
 
-```python
-from context_retriever import Document
+## 🤝 Contributing
 
-docs = [
-    Document(
-        content="Your documentation content",
-        metadata={"table": "table_name", "type": "schema"}
-    )
-]
-context_retriever.add_documents(docs)
-context_retriever.save_index()
-```
+We follow a structured Git workflow:
 
-## Security Best Practices
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Make changes with descriptive commits
+3. Create pull request to `dev` branch
+4. After review, merge to `dev`
+5. Periodically release from `dev` to `main`
 
-1. **Never commit credentials**: Use environment variables
-2. **Rotate tokens regularly**: Update Databricks access tokens
-3. **Monitor rate limits**: Adjust based on usage patterns
-4. **Audit logs**: Review query patterns for anomalies
-5. **Schema restrictions**: Only expose necessary tables
-6. **Input validation**: Always enabled in production
+See [Git Workflow Guide](docs/GIT_WORKFLOW.md) for details.
 
-## Troubleshooting
+---
 
-### Connection Issues
-```bash
-# Test Databricks connection
-python -c "from databricks_client import DatabricksClient; \
-client = DatabricksClient('hostname', 'path', 'token'); \
-print(client.test_connection())"
-```
+## 📝 License
 
-### FAISS Index Issues
-```bash
-# Clear and rebuild index
-rm -f data/faiss_index.faiss*
-python main.py
-# Index will be recreated with sample documents
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Rate Limit Errors
-Adjust in `.env`:
-```ini
-RATE_LIMIT_PER_MINUTE=120
-```
+---
 
-## Contributing
+## 🎓 Credits
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+Built with:
+- [Databricks](https://databricks.com/) - Data lakehouse platform
+- [FAISS](https://github.com/facebookresearch/faiss) - Vector search
+- [Streamlit](https://streamlit.io/) - Web UI framework
+- [Sentence Transformers](https://www.sbert.net/) - Embeddings
+- [Delta Lake](https://delta.io/) - Storage layer
 
-## License
+---
 
-MIT License - see LICENSE file for details
+## 📞 Support
 
-## Support
+- **Documentation:** See [docs/](docs/) directory
+- **Issues:** Open an issue on GitHub
+- **Questions:** Check [SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
 
-For issues and questions:
-- Open an issue on GitHub
-- Contact: [Your Contact Information]
+---
 
-## Roadmap
+## 🗺️ Roadmap
 
-- [ ] LLM integration for better query understanding
 - [ ] Multi-table join support
-- [ ] Query history and learning
-- [ ] REST API interface
-- [ ] Web UI dashboard
-- [ ] Advanced analytics (forecasting, anomaly detection)
-- [ ] Multi-language support
-- [ ] Enhanced visualization
+- [ ] Advanced visualizations
+- [ ] Query history and favorites
+- [ ] Real-time data streaming
+- [ ] Advanced ML query understanding
+- [ ] Export to multiple formats
+
+---
+
+**Version:** 2.0.0  
+**Status:** ✅ Production Ready  
+**Last Updated:** January 11, 2026
+
+---
+
+Made with ❤️ by the Databricks Insight Agent Team

@@ -9,11 +9,16 @@ import logging
 from dotenv import load_dotenv
 import colorlog
 
-from databricks_client import DatabricksClient
-from sql_generator import SchemaManager, SQLGenerator, TableSchema
-from context_retriever import ContextRetriever, create_sample_documents
-from security import SecurityValidator, SecurityConfig, SchemaValidator, RateLimiter
-from agent import DatabricksInsightAgent, QueryType
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from src.data.databricks_client import DatabricksClient
+from src.intelligence.sql_generator import SchemaManager, SQLGenerator, TableSchema
+from src.intelligence.context_retriever import ContextRetriever
+from src.intelligence.document_processor import create_knowledge_base_documents
+from src.security.security import SecurityValidator, SecurityConfig, SchemaValidator, RateLimiter
+from src.core.agent import DatabricksInsightAgent, QueryType
 
 
 def setup_logging():
