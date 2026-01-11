@@ -1,0 +1,28 @@
+# Databricks connectivity
+databricks-sql-connector>=3.0.0
+
+# Vector search and embeddings
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+
+# LLM and NLP
+openai>=1.0.0
+langchain>=0.1.0
+langchain-community>=0.0.10
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Security and validation
+sqlparse>=0.4.4
+pydantic>=2.0.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Logging
+colorlog>=6.7.0
+
+# Rate limiting
+ratelimit>=2.2.1
