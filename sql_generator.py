@@ -153,7 +153,7 @@ class SQLGenerator:
                 elif isinstance(value, list):
                     # IN clause
                     if all(isinstance(v, str) for v in value):
-                        values_str = ', '.join([f"'{v.replace(\"'\", \"''\")}'" for v in value])
+                        values_str = ', '.join([f"'{v.replace(chr(39), chr(39)+chr(39))}'" for v in value])
                     else:
                         values_str = ', '.join([str(v) for v in value])
                     where_parts.append(f"{col} IN ({values_str})")
