@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.data.databricks_client import DatabricksClient
 from src.intelligence.sql_generator import SchemaManager, SQLGenerator, TableSchema
+from src.intelligence.schema_loader import SchemaLoader, create_schema_manager_from_databricks
 from src.intelligence.context_retriever import ContextRetriever
 from src.intelligence.document_processor import create_knowledge_base_documents
 from src.security.security import SecurityValidator, SecurityConfig, SchemaValidator, RateLimiter
@@ -48,7 +49,8 @@ def load_configuration():
         'databricks_hostname': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
         'databricks_http_path': os.getenv('DATABRICKS_HTTP_PATH'),
         'databricks_token': os.getenv('DATABRICKS_ACCESS_TOKEN'),
-        'openai_api_key': os.getenv('OPENAI_API_KEY'),
+        'mistral_api_key': os.getenv('MISTRAL_API_KEY'),
+        'mistral_model': os.getenv('MISTRAL_MODEL', 'mistral-large-latest'),
         'faiss_index_path': os.getenv('FAISS_INDEX_PATH', './data/faiss_index.faiss'),
         'max_query_length': int(os.getenv('MAX_QUERY_LENGTH', '10000')),
         'rate_limit_per_minute': int(os.getenv('RATE_LIMIT_PER_MINUTE', '60')),
@@ -59,61 +61,44 @@ def load_configuration():
     return config
 
 
-def initialize_schema_manager(sample_mode: bool = True):
+def initialize_schema_manager(
+    databricks_client=None,
+    catalog: str = "hive_metastore",
+    schema: str = "default",
+    specific_tables: list = None,
+    sample_mode: bool = True
+):
     """
     Initialize the schema manager with table definitions.
-    In production, this would load from Databricks.
+    Auto-detects schema from Databricks or falls back to sample data.
     
     Args:
-        sample_mode: If True, use sample schema for demonstration
-    """
-    schema_manager = SchemaManager()
+        databricks_client: DatabricksClient instance (None for sample mode)
+        catalog: Databricks catalog name
+        schema: Databricks schema/database name
+        specific_tables: Optional list of specific table names to load (e.g., ['superstore'])
+        sample_mode: If True, fallback to sample schema if Databricks unavailable
     
-    if sample_mode:
-        # Add sample tables for demonstration
-        sales_table = TableSchema(
-            name="sales",
-            columns=["transaction_id", "customer_id", "product_id", "amount", "date", "region"],
-            column_types={
-                "transaction_id": "STRING",
-                "customer_id": "STRING",
-                "product_id": "STRING",
-                "amount": "DECIMAL",
-                "date": "DATE",
-                "region": "STRING"
-            },
-            description="Sales transaction data"
+    Returns:
+        SchemaManager instance
+    """
+    if databricks_client:
+        # Auto-detect schema from Databricks
+        logger.info("🔍 Auto-detecting schema from Databricks...")
+        schema_manager = create_schema_manager_from_databricks(
+            databricks_client=databricks_client,
+            catalog=catalog,
+            schema=schema,
+            specific_tables=specific_tables,
+            fallback_to_sample=sample_mode
         )
-        
-        customers_table = TableSchema(
-            name="customers",
-            columns=["customer_id", "name", "email", "registration_date", "country"],
-            column_types={
-                "customer_id": "STRING",
-                "name": "STRING",
-                "email": "STRING",
-                "registration_date": "DATE",
-                "country": "STRING"
-            },
-            description="Customer information"
+    else:
+        # Use sample schema
+        logger.info("📋 Using sample schema (no Databricks connection)")
+        schema_manager = create_schema_manager_from_databricks(
+            databricks_client=None,
+            fallback_to_sample=True
         )
-        
-        products_table = TableSchema(
-            name="products",
-            columns=["product_id", "name", "category", "price", "stock_quantity"],
-            column_types={
-                "product_id": "STRING",
-                "name": "STRING",
-                "category": "STRING",
-                "price": "DECIMAL",
-                "stock_quantity": "INT"
-            },
-            description="Product catalog"
-        )
-        
-        schema_manager.add_table(sales_table)
-        schema_manager.add_table(customers_table)
-        schema_manager.add_table(products_table)
     
     return schema_manager
 

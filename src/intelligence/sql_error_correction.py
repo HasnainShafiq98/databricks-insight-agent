@@ -158,7 +158,7 @@ class SQLCorrector:
         """Correct column name errors by suggesting similar column names."""
         
         # Extract the problematic column name
-        pattern = r"column '?(\w+)'?"
+        pattern = r"column[,\s]+'?`?(\w+)`?'?"
         match = re.search(pattern, sql_error.error_message, re.IGNORECASE)
         if not match:
             return None
@@ -166,7 +166,7 @@ class SQLCorrector:
         wrong_column = match.group(1)
         
         # Find the table being queried
-        table_pattern = r"FROM\s+(\w+)"
+        table_pattern = r"FROM\s+`?(\w+)`?"
         table_match = re.search(table_pattern, sql_error.sql_query, re.IGNORECASE)
         if not table_match:
             return None
@@ -181,7 +181,9 @@ class SQLCorrector:
         similar_column = self._find_similar_string(wrong_column, table_columns)
         
         if similar_column:
-            corrected_sql = sql_error.sql_query.replace(wrong_column, similar_column)
+            # Quote the column name if it contains spaces or special characters
+            quoted_column = f"`{similar_column}`" if ' ' in similar_column or '-' in similar_column else similar_column
+            corrected_sql = sql_error.sql_query.replace(wrong_column, quoted_column)
             
             return SQLCorrection(
                 original_sql=sql_error.sql_query,

@@ -73,6 +73,17 @@ class SQLGenerator:
     def __init__(self, schema_manager: SchemaManager):
         self.schema_manager = schema_manager
     
+    @staticmethod
+    def quote_identifier(identifier: str) -> str:
+        """
+        Quote SQL identifiers (column/table names) with backticks if needed.
+        Required for identifiers with spaces or special characters.
+        """
+        # If identifier contains spaces or special chars, wrap in backticks
+        if ' ' in identifier or '-' in identifier or any(c in identifier for c in '!@#$%^&*()+=[]{}|;:,.<>?/'):
+            return f"`{identifier}`"
+        return identifier
+    
     def generate_sql(
         self, 
         table_name: str,
@@ -129,11 +140,13 @@ class SQLGenerator:
                     logger.error(f"Invalid aggregation function: {agg_func}")
                     return None
                 
-                select_parts.append(f"{agg_func.upper()}({col}) as {col}_{agg_func.lower()}")
+                quoted_col = self.quote_identifier(col)
+                select_parts.append(f"{agg_func.upper()}({quoted_col}) as {col}_{agg_func.lower()}")
         else:
-            select_parts = select_cols
+            select_parts = [self.quote_identifier(col) for col in select_cols]
         
-        sql = f"SELECT {', '.join(select_parts)} FROM {table_name}"
+        quoted_table = self.quote_identifier(table_name)
+        sql = f"SELECT {', '.join(select_parts)} FROM {quoted_table}"
         
         # Build WHERE clause
         if filters:
@@ -143,22 +156,23 @@ class SQLGenerator:
                     logger.error(f"Column {col} not found in table {table_name}")
                     return None
                 
+                quoted_col = self.quote_identifier(col)
                 # Handle different value types
                 if isinstance(value, str):
                     # Escape single quotes in string values
                     escaped_value = value.replace("'", "''")
-                    where_parts.append(f"{col} = '{escaped_value}'")
+                    where_parts.append(f"{quoted_col} = '{escaped_value}'")
                 elif isinstance(value, (int, float)):
-                    where_parts.append(f"{col} = {value}")
+                    where_parts.append(f"{quoted_col} = {value}")
                 elif isinstance(value, list):
                     # IN clause
                     if all(isinstance(v, str) for v in value):
                         values_str = ', '.join([f"'{v.replace(chr(39), chr(39)+chr(39))}'" for v in value])
                     else:
                         values_str = ', '.join([str(v) for v in value])
-                    where_parts.append(f"{col} IN ({values_str})")
+                    where_parts.append(f"{quoted_col} IN ({values_str})")
                 elif value is None:
-                    where_parts.append(f"{col} IS NULL")
+                    where_parts.append(f"{quoted_col} IS NULL")
             
             if where_parts:
                 sql += " WHERE " + " AND ".join(where_parts)
@@ -169,7 +183,8 @@ class SQLGenerator:
                 if not self.schema_manager.column_exists(table_name, col):
                     logger.error(f"Column {col} not found in table {table_name}")
                     return None
-            sql += f" GROUP BY {', '.join(group_by)}"
+            quoted_group_by = [self.quote_identifier(col) for col in group_by]
+            sql += f" GROUP BY {', '.join(quoted_group_by)}"
         
         # Build ORDER BY clause
         if order_by:
@@ -184,7 +199,8 @@ class SQLGenerator:
                     logger.error(f"Invalid order direction: {direction}")
                     return None
                 
-                order_parts.append(f"{col} {direction}")
+                quoted_col = self.quote_identifier(col)
+                order_parts.append(f"{quoted_col} {direction}")
             
             if order_parts:
                 sql += f" ORDER BY {', '.join(order_parts)}"

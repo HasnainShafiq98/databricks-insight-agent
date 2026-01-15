@@ -57,7 +57,9 @@ class DatabricksInsightAgent:
         schema_manager,
         sql_generator,
         context_retriever,
-        security_validator
+        security_validator,
+        rate_limiter=None,
+        llm_service=None
     ):
         """
         Initialize the Databricks Insight Agent.
@@ -68,12 +70,16 @@ class DatabricksInsightAgent:
             sql_generator: SQL query generator
             context_retriever: FAISS-based context retrieval
             security_validator: Security validation
+            rate_limiter: Rate limiter for API calls (optional)
+            llm_service: LLM service for enhanced query understanding (optional)
         """
         self.databricks_client = databricks_client
         self.schema_manager = schema_manager
         self.sql_generator = sql_generator
         self.context_retriever = context_retriever
         self.security_validator = security_validator
+        self.rate_limiter = rate_limiter
+        self.llm_service = llm_service
     
     def process_query(self, user_query: str, user_id: str = "default") -> AgentResponse:
         """
@@ -104,19 +110,20 @@ class DatabricksInsightAgent:
             )
         
         # Step 2: Rate limiting
-        rate_ok, rate_msg = self.security_validator.check_rate_limit(user_id)
-        if not rate_ok:
-            logger.warning(f"Rate limit exceeded for user {user_id}")
-            return AgentResponse(
-                success=False,
-                query_type=QueryType.CLARIFICATION,
-                sql_query=None,
-                results=None,
-                context=None,
-                insights="",
-                clarification_needed=None,
-                error=rate_msg
-            )
+        if self.rate_limiter:
+            rate_ok, rate_msg = self.rate_limiter.check_rate_limit(user_id)
+            if not rate_ok:
+                logger.warning(f"Rate limit exceeded for user {user_id}")
+                return AgentResponse(
+                    success=False,
+                    query_type=QueryType.CLARIFICATION,
+                    sql_query=None,
+                    results=None,
+                    context=None,
+                    insights="",
+                    clarification_needed=None,
+                    error=rate_msg
+                )
         
         # Step 3: Analyze query to understand intent
         query_analysis = self.analyze_query(user_query)
@@ -179,7 +186,7 @@ class DatabricksInsightAgent:
                     )
         
         # Step 7: Generate insights from results and context
-        insights = self._generate_insights(user_query, results, context, query_analysis)
+        insights = self._generate_insights(user_query, results, context, query_analysis, sql_query=sql_query)
         
         return AgentResponse(
             success=True,
@@ -270,6 +277,23 @@ class DatabricksInsightAgent:
         # Use the first identified table
         table_name = analysis.target_tables[0]
         
+        # Try LLM-powered SQL generation if available
+        if self.llm_service:
+            try:
+                schema_info = self.schema_manager.get_schema_summary()
+                sql = self.llm_service.generate_sql_from_query(
+                    user_query=user_query,
+                    schema_info=schema_info,
+                    context=context
+                )
+                
+                if sql:
+                    logger.info("Generated SQL using Mistral AI")
+                    return sql
+            except Exception as e:
+                logger.warning(f"LLM SQL generation failed, falling back to rule-based: {e}")
+        
+        # Fallback to rule-based SQL generation
         # Parse query intent
         intent = self.sql_generator.parse_query_intent(user_query, context)
         intent['table_name'] = table_name
@@ -287,7 +311,8 @@ class DatabricksInsightAgent:
         user_query: str,
         results: Optional[List[Dict[str, Any]]],
         context: Optional[str],
-        analysis: QueryAnalysis
+        analysis: QueryAnalysis,
+        sql_query: Optional[str] = None
     ) -> str:
         """
         Generate business-focused insights from results and context.
@@ -297,10 +322,26 @@ class DatabricksInsightAgent:
             results: SQL query results
             context: Retrieved context
             analysis: Query analysis
+            sql_query: SQL query that was executed
             
         Returns:
             Human-readable insights
         """
+        # Try LLM-powered insights generation if available
+        if self.llm_service:
+            try:
+                insights = self.llm_service.generate_insights(
+                    user_query=user_query,
+                    sql_query=sql_query,
+                    results=results,
+                    context=context
+                )
+                logger.info("Generated insights using Mistral AI")
+                return insights
+            except Exception as e:
+                logger.warning(f"LLM insights generation failed, falling back to rule-based: {e}")
+        
+        # Fallback to rule-based insights generation
         insights = []
         
         # Add context-based insights

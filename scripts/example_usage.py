@@ -332,7 +332,7 @@ def main():
         
         # Security
         security_config = SecurityConfig()
-        rate_limiter = RateLimiter(max_requests=60)
+        rate_limiter = RateLimiter(max_calls_per_minute=60)
         schema_validator = SchemaValidator(schema_manager, security_config)
         security_validator = SecurityValidator(security_config, rate_limiter, schema_validator)
         

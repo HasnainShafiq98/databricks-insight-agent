@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.data.databricks_client import DatabricksClient
 from src.intelligence.sql_generator import SchemaManager, SQLGenerator, TableSchema
+from src.intelligence.schema_loader import SchemaLoader, create_schema_manager_from_databricks
 from src.intelligence.context_retriever import ContextRetriever
 from src.intelligence.document_processor import create_knowledge_base_documents
 from src.security.security import SecurityValidator, SecurityConfig, SchemaValidator, RateLimiter
@@ -111,7 +112,10 @@ def load_configuration():
         'databricks_hostname': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
         'databricks_http_path': os.getenv('DATABRICKS_HTTP_PATH'),
         'databricks_token': os.getenv('DATABRICKS_ACCESS_TOKEN'),
-        'openai_api_key': os.getenv('OPENAI_API_KEY'),
+        'catalog': os.getenv('DATABRICKS_CATALOG', 'workspace'),
+        'schema': os.getenv('DATABRICKS_SCHEMA', 'default'),
+        'mistral_api_key': os.getenv('MISTRAL_API_KEY'),
+        'mistral_model': os.getenv('MISTRAL_MODEL', 'mistral-large-latest'),
         'faiss_index_path': os.getenv('FAISS_INDEX_PATH', './data/faiss_index.faiss'),
         'max_query_length': int(os.getenv('MAX_QUERY_LENGTH', '10000')),
         'rate_limit_per_minute': int(os.getenv('RATE_LIMIT_PER_MINUTE', '60')),
@@ -136,54 +140,22 @@ def initialize_agent(config, use_sample_data=True):
             st.warning("⚠️ Databricks credentials not configured. Using mock mode.")
             databricks_client = None
         
-        # Initialize schema manager with sample data
-        schema_manager = SchemaManager()
-        
-        if use_sample_data:
-            # Add sample tables
-            sales_table = TableSchema(
-                name="sales",
-                columns=["transaction_id", "customer_id", "product_id", "amount", "date", "region"],
-                column_types={
-                    "transaction_id": "STRING",
-                    "customer_id": "STRING",
-                    "product_id": "STRING",
-                    "amount": "DECIMAL",
-                    "date": "DATE",
-                    "region": "STRING"
-                },
-                description="Sales transaction data"
+        # Initialize schema manager with auto-detection
+        if databricks_client:
+            # Auto-detect schema from Databricks
+            schema_manager = create_schema_manager_from_databricks(
+                databricks_client=databricks_client,
+                catalog=config.get('catalog', 'hive_metastore'),
+                schema=config.get('schema', 'default'),
+                specific_tables=config.get('specific_tables', None),
+                fallback_to_sample=use_sample_data
             )
-            
-            customers_table = TableSchema(
-                name="customers",
-                columns=["customer_id", "name", "email", "registration_date", "country"],
-                column_types={
-                    "customer_id": "STRING",
-                    "name": "STRING",
-                    "email": "STRING",
-                    "registration_date": "DATE",
-                    "country": "STRING"
-                },
-                description="Customer information"
+        else:
+            # Use sample schema when no Databricks connection
+            schema_manager = create_schema_manager_from_databricks(
+                databricks_client=None,
+                fallback_to_sample=True
             )
-            
-            products_table = TableSchema(
-                name="products",
-                columns=["product_id", "name", "category", "price", "stock_quantity"],
-                column_types={
-                    "product_id": "STRING",
-                    "name": "STRING",
-                    "category": "STRING",
-                    "price": "DECIMAL",
-                    "stock_quantity": "INTEGER"
-                },
-                description="Product catalog"
-            )
-            
-            schema_manager.add_table(sales_table)
-            schema_manager.add_table(customers_table)
-            schema_manager.add_table(products_table)
         
         # Initialize SQL generator
         sql_generator = SQLGenerator(schema_manager)
@@ -209,9 +181,30 @@ def initialize_agent(config, use_sample_data=True):
             allowed_schemas=config['allowed_schemas']
         )
         
-        rate_limiter = RateLimiter(max_requests=security_config.rate_limit_per_minute)
-        schema_validator = SchemaValidator(schema_manager, security_config)
-        security_validator = SecurityValidator(security_config, rate_limiter, schema_validator)
+        rate_limiter = RateLimiter(max_calls_per_minute=security_config.rate_limit_per_minute)
+        
+        # Build known_tables dictionary for schema validator
+        known_tables = {
+            table_name: schema_manager.get_table_columns(table_name)
+            for table_name in schema_manager.get_all_tables()
+        }
+        schema_validator = SchemaValidator(known_tables)
+        
+        security_validator = SecurityValidator(security_config)
+        
+        # Initialize LLM service (optional)
+        llm_service = None
+        if config.get('mistral_api_key'):
+            try:
+                from src.intelligence.llm_service import create_llm_service
+                llm_service = create_llm_service(
+                    api_key=config['mistral_api_key'],
+                    model=config.get('mistral_model', 'mistral-large-latest')
+                )
+                if llm_service:
+                    st.success("✅ Mistral AI enabled for enhanced query understanding")
+            except Exception as e:
+                st.warning(f"⚠️ Could not initialize Mistral AI: {e}")
         
         # Create agent
         agent = DatabricksInsightAgent(
@@ -219,7 +212,9 @@ def initialize_agent(config, use_sample_data=True):
             schema_manager=schema_manager,
             sql_generator=sql_generator,
             context_retriever=context_retriever,
-            security_validator=security_validator
+            security_validator=security_validator,
+            rate_limiter=rate_limiter,
+            llm_service=llm_service
         )
         
         return agent
@@ -287,11 +282,10 @@ def render_message(message):
     """Render a chat message with proper formatting."""
     
     role = message["role"]
-    content = message["content"]
     
     if role == "user":
         with st.chat_message("user"):
-            st.markdown(content)
+            st.markdown(message.get("content", ""))
     else:
         with st.chat_message("assistant"):
             # Display the main insight
@@ -387,6 +381,7 @@ def main():
             # Create response message
             response_message = {
                 "role": "assistant",
+                "content": response.insights or response.error or response.clarification_needed or "",
                 "insights": response.insights,
                 "sql_query": response.sql_query,
                 "results": response.results,
